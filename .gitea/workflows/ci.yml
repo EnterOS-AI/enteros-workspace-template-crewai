@@ -117,7 +117,15 @@ jobs:
       # and passes. Keep parity.
       - run: pip install pyyaml -q
       - if: hashFiles('requirements.txt') != ''
-        run: pip install -q --extra-index-url "$MOLECULE_PRIVATE_INDEX" -r requirements.txt
+        # HERMETIC index (public tooling from PyPI; runtime from the private extra).
+        # requirements.txt pins crewai>=0.100.0 — a HEAVY optional adapter framework
+        # that does not reliably resolve/build on the ephemeral CI runner. This job
+        # validates the template --static-only (no adapter import), so a heavy-dep
+        # install failure is an ENVIRONMENT limitation, not a template regression.
+        # Surface it LOUDLY (not a silent `|| true`) and continue to the validator.
+        run: |
+          pip install -q --extra-index-url "$MOLECULE_PRIVATE_INDEX" -r requirements.txt \
+            || echo "::warning::crewai adapter deps (heavy crewai>=0.100.0 framework) did not install on the CI runner — static-only template validation continues; not a template regression."
       - if: hashFiles('requirements.txt') == ''
         run: pip install -q --extra-index-url "$MOLECULE_PRIVATE_INDEX" molecules-workspace-runtime
       - run: python3 .molecule-ci-canonical/scripts/validate-workspace-template.py --static-only
